@@ -168,6 +168,7 @@ class ClassesCog(commands.Cog):
             for c in classes if current.lower() in c["name"].lower()
         ][:25]
 
-
 async def setup(bot: commands.Bot):
-    await bot.add_cog(ClassesCog(bot))
+    cog = ClassesCog(bot)
+    await bot.add_cog(cog)
+    bot.tree.add_command(cog.class_group)
