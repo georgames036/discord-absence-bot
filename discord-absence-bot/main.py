@@ -34,9 +34,14 @@ INITIAL_EXTENSIONS = [
 @bot.event
 async def on_ready():
     logger.info(f"ログイン成功: {bot.user} (ID: {bot.user.id})")
+
     try:
-        synced = await bot.tree.sync()
-        logger.info(f"スラッシュコマンドを {len(synced)} 件同期しました。")
+        for guild in bot.guilds:
+            synced = await bot.tree.sync(guild=guild)
+            logger.info(
+                f"サーバー「{guild.name}」に "
+                f"{len(synced)} 件のスラッシュコマンドを同期しました。"
+            )
     except Exception as e:
         logger.exception(f"コマンド同期に失敗しました: {e}")
 
