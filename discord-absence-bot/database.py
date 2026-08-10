@@ -1,6 +1,5 @@
 """
 Googleスプレッドシートをデータベースとして使うモジュール。
-
 Render上のローカルSQLiteには保存せず、
 Google Apps Script Web APIを経由してGoogleスプレッドシートに保存する。
 """
