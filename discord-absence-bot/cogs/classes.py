@@ -280,10 +280,4 @@ class ClassesCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    cog = ClassesCog(bot)
-
-    await bot.add_cog(cog)
-
-    bot.tree.add_command(
-        ClassesCog.class_group
-    )
+    await bot.add_cog(ClassesCog(bot))
