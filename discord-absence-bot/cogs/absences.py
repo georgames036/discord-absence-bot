@@ -289,10 +289,4 @@ class AbsencesCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    cog = AbsencesCog(bot)
-
-    await bot.add_cog(cog)
-
-    bot.tree.add_command(
-        AbsencesCog.absence_group
-    )
+    await bot.add_cog(AbsencesCog(bot))
