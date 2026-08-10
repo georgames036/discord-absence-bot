@@ -37,11 +37,17 @@ async def on_ready():
 
     try:
         for guild in bot.guilds:
+            # グローバルコマンドをこのサーバーにコピー
+            bot.tree.copy_global_to(guild=guild)
+
+            # サーバー単位で同期
             synced = await bot.tree.sync(guild=guild)
+
             logger.info(
                 f"サーバー「{guild.name}」に "
                 f"{len(synced)} 件のスラッシュコマンドを同期しました。"
             )
+
     except Exception as e:
         logger.exception(f"コマンド同期に失敗しました: {e}")
 
