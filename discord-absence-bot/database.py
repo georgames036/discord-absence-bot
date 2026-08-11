@@ -4,10 +4,10 @@ Render上のローカルSQLiteには保存せず、
 Google Apps Script Web APIを経由してGoogleスプレッドシートに保存する。
 """
 
+import json
 import os
 from datetime import date
 from typing import Optional
-from urllib.parse import urljoin
 
 import aiohttp
 
@@ -34,40 +34,16 @@ WEEKDAY_JP = ["月", "火", "水", "木", "金", "土", "日"]
 # ============================================================
 # GAS API通信
 # ============================================================
-
-async def _post_json(session: aiohttp.ClientSession, url: str, payload: dict, _depth: int = 0) -> dict:
-    """
-    GAS WebアプリにPOSTする。
-
-    GAS(script.google.com/.../exec)は一度 script.googleusercontent.com へ
-    302リダイレクトする。多くのHTTPクライアント（aiohttp含む）は
-    301/302リダイレクトを自動で追う際にPOSTをGETへ変換してしまうため、
-    doPost() ではなく doGet() が呼ばれてJSONではないレスポンスが返ってきてしまう。
-
-    これを避けるため、リダイレクトは自動で追わせず（allow_redirects=False）、
-    Locationヘッダーへ改めて同じPOSTを手動で送り直す。
-    """
-    if _depth > 5:
-        raise RuntimeError("GAS APIのリダイレクトが多すぎます。")
-
-    async with session.post(url, json=payload, allow_redirects=False) as response:
-        if response.status in (301, 302, 303, 307, 308):
-            location = response.headers.get("Location")
-            if not location:
-                raise RuntimeError("GAS APIからのリダイレクト先(Location)が取得できませんでした。")
-            absolute_location = urljoin(str(response.url), location)
-            return await _post_json(session, absolute_location, payload, _depth=_depth + 1)
-
-        text = await response.text()
-
-        if response.status != 200:
-            raise RuntimeError(f"GAS API HTTPエラー: {response.status}: {text}")
-
-        try:
-            return await response.json(content_type=None)
-        except Exception:
-            raise RuntimeError(f"GAS APIがJSONを返しませんでした: {text}")
-
+#
+# GAS(script.google.com/.../exec)は必ず一度 script.googleusercontent.com へ
+# 302リダイレクトする。POSTでこれを行うと、多くのHTTPクライアント（aiohttp含む）が
+# リダイレクトの途中でPOSTをGETに変換してしまい、doPost()ではなくdoGet()が
+# 呼ばれてしまう問題が起きる（手動でPOSTを追いかけ直しても、Google側のURLの
+# 仕様上うまくいかないケースがある）。
+#
+# GETはリダイレクトを挟んでもメソッドが変わらないため、この問題が原理的に起きない。
+# そのため、すべてのリクエストをGET + クエリパラメータ方式に統一する。
+# (GAS側の doGet も同様に action / data を受け取れるよう対応させる必要がある)
 
 async def _request(action: str, data: Optional[dict] = None) -> dict:
     if not GAS_API_URL:
@@ -76,23 +52,32 @@ async def _request(action: str, data: Optional[dict] = None) -> dict:
     if not GAS_API_KEY:
         raise RuntimeError("GAS_API_KEY が設定されていません。")
 
-    payload = {
+    params = {
         "action": action,
         "api_key": GAS_API_KEY,
-        "data": data or {},
+        "data": json.dumps(data or {}, ensure_ascii=False),
     }
 
     timeout = aiohttp.ClientTimeout(total=30)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        result = await _post_json(session, GAS_API_URL, payload)
+        async with session.get(GAS_API_URL, params=params) as response:
+            text = await response.text()
 
-        if not result.get("ok", False):
-            raise RuntimeError(
-                f"GAS APIエラー: {result.get('error', '不明なエラー')}"
-            )
+            if response.status != 200:
+                raise RuntimeError(f"GAS API HTTPエラー: {response.status}: {text}")
 
-        return result.get("data", {})
+            try:
+                result = json.loads(text)
+            except Exception:
+                raise RuntimeError(f"GAS APIがJSONを返しませんでした: {text}")
+
+    if not result.get("ok", False):
+        raise RuntimeError(
+            f"GAS APIエラー: {result.get('error', '不明なエラー')}"
+        )
+
+    return result.get("data", {})
 
 
 # ============================================================
