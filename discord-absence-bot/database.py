@@ -7,6 +7,7 @@ Google Apps Script Web APIを経由してGoogleスプレッドシートに保存
 import os
 from datetime import date
 from typing import Optional
+from urllib.parse import urljoin
 
 import aiohttp
 
@@ -34,6 +35,40 @@ WEEKDAY_JP = ["月", "火", "水", "木", "金", "土", "日"]
 # GAS API通信
 # ============================================================
 
+async def _post_json(session: aiohttp.ClientSession, url: str, payload: dict, _depth: int = 0) -> dict:
+    """
+    GAS WebアプリにPOSTする。
+
+    GAS(script.google.com/.../exec)は一度 script.googleusercontent.com へ
+    302リダイレクトする。多くのHTTPクライアント（aiohttp含む）は
+    301/302リダイレクトを自動で追う際にPOSTをGETへ変換してしまうため、
+    doPost() ではなく doGet() が呼ばれてJSONではないレスポンスが返ってきてしまう。
+
+    これを避けるため、リダイレクトは自動で追わせず（allow_redirects=False）、
+    Locationヘッダーへ改めて同じPOSTを手動で送り直す。
+    """
+    if _depth > 5:
+        raise RuntimeError("GAS APIのリダイレクトが多すぎます。")
+
+    async with session.post(url, json=payload, allow_redirects=False) as response:
+        if response.status in (301, 302, 303, 307, 308):
+            location = response.headers.get("Location")
+            if not location:
+                raise RuntimeError("GAS APIからのリダイレクト先(Location)が取得できませんでした。")
+            absolute_location = urljoin(str(response.url), location)
+            return await _post_json(session, absolute_location, payload, _depth=_depth + 1)
+
+        text = await response.text()
+
+        if response.status != 200:
+            raise RuntimeError(f"GAS API HTTPエラー: {response.status}: {text}")
+
+        try:
+            return await response.json(content_type=None)
+        except Exception:
+            raise RuntimeError(f"GAS APIがJSONを返しませんでした: {text}")
+
+
 async def _request(action: str, data: Optional[dict] = None) -> dict:
     if not GAS_API_URL:
         raise RuntimeError("GAS_API_URL が設定されていません。")
@@ -50,27 +85,14 @@ async def _request(action: str, data: Optional[dict] = None) -> dict:
     timeout = aiohttp.ClientTimeout(total=30)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.post(GAS_API_URL, json=payload) as response:
-            text = await response.text()
+        result = await _post_json(session, GAS_API_URL, payload)
 
-            if response.status != 200:
-                raise RuntimeError(
-                    f"GAS API HTTPエラー: {response.status}: {text}"
-                )
+        if not result.get("ok", False):
+            raise RuntimeError(
+                f"GAS APIエラー: {result.get('error', '不明なエラー')}"
+            )
 
-            try:
-                result = await response.json()
-            except Exception:
-                raise RuntimeError(
-                    f"GAS APIがJSONを返しませんでした: {text}"
-                )
-
-            if not result.get("ok", False):
-                raise RuntimeError(
-                    f"GAS APIエラー: {result.get('error', '不明なエラー')}"
-                )
-
-            return result.get("data", {})
+        return result.get("data", {})
 
 
 # ============================================================
