@@ -1,6 +1,7 @@
 """
 Discord 欠席管理ボット エントリーポイント
 """
+
 import os
 import asyncio
 import logging
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 import database as db
 from keep_alive import start_keep_alive_server
 
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -20,9 +22,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("absence_bot")
 
 intents = discord.Intents.default()
-# メンバー/メッセージ内容の特権インテントは今回不要（スラッシュコマンドのみ使用）
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents
+)
+
 
 INITIAL_EXTENSIONS = [
     "cogs.classes",
@@ -33,40 +38,93 @@ INITIAL_EXTENSIONS = [
 
 @bot.event
 async def on_ready():
-    logger.info(f"ログイン成功: {bot.user} (ID: {bot.user.id})")
+
+    logger.info(
+        f"ログイン成功: {bot.user} "
+        f"(ID: {bot.user.id})"
+    )
+
+    # 起動時に一度だけ同期
+    if getattr(bot, "_commands_synced", False):
+        return
+
+    bot._commands_synced = True
 
     try:
-        # グローバルコマンドを全削除
+
+        # ========================================
+        # グローバルコマンドを削除
+        # ========================================
+
         bot.tree.clear_commands(guild=None)
+
         await bot.tree.sync()
 
-        # ギルド用コマンドだけ同期
+        logger.info(
+            "グローバルスラッシュコマンドを削除しました。"
+        )
+
+        # ========================================
+        # ギルド用コマンドを登録
+        # ========================================
+
         for guild in bot.guilds:
-            synced = await bot.tree.sync(guild=guild)
+
+            # bot.tree に登録されているコマンドを
+            # このギルド用Treeへコピー
+            bot.tree.copy_global_to(
+                guild=guild
+            )
+
+            # ギルドへ同期
+            synced = await bot.tree.sync(
+                guild=guild
+            )
 
             logger.info(
                 f"サーバー「{guild.name}」に "
                 f"{len(synced)} 件のギルド用スラッシュコマンドを同期しました。"
             )
 
-    except Exception as e:
-        logger.exception(f"コマンド同期に失敗しました: {e}")
+    except Exception:
+        logger.exception(
+            "スラッシュコマンドの同期に失敗しました。"
+        )
+
 
 async def main():
+
     if not TOKEN:
         raise RuntimeError(
-            "DISCORD_TOKEN が設定されていません。.env ファイルを作成し、"
+            "DISCORD_TOKEN が設定されていません。"
+            ".env ファイルを作成し、"
             "DISCORD_TOKEN=あなたのトークン を記入してください。"
         )
 
     await db.init_db()
 
     async with bot:
-        # KoyebなどのPaaSで生存確認・スリープ回避のためのHTTPサーバーを起動
+
+        # Keep Alive
         await start_keep_alive_server()
 
+        # Cogを読み込む
         for ext in INITIAL_EXTENSIONS:
-            await bot.load_extension(ext)
+
+            try:
+
+                await bot.load_extension(ext)
+
+                logger.info(
+                    f"Extension loaded: {ext}"
+                )
+
+            except Exception:
+                logger.exception(
+                    f"Extensionの読み込みに失敗しました: {ext}"
+                )
+                raise
+
         await bot.start(TOKEN)
 
 
