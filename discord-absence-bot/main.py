@@ -36,21 +36,21 @@ async def on_ready():
     logger.info(f"ログイン成功: {bot.user} (ID: {bot.user.id})")
 
     try:
-        for guild in bot.guilds:
-            # グローバルコマンドをこのサーバーにコピー
-            bot.tree.copy_global_to(guild=guild)
+        # グローバルコマンドを全削除
+        bot.tree.clear_commands(guild=None)
+        await bot.tree.sync()
 
-            # サーバー単位で同期
+        # ギルド用コマンドだけ同期
+        for guild in bot.guilds:
             synced = await bot.tree.sync(guild=guild)
 
             logger.info(
                 f"サーバー「{guild.name}」に "
-                f"{len(synced)} 件のスラッシュコマンドを同期しました。"
+                f"{len(synced)} 件のギルド用スラッシュコマンドを同期しました。"
             )
 
     except Exception as e:
         logger.exception(f"コマンド同期に失敗しました: {e}")
-
 
 async def main():
     if not TOKEN:
