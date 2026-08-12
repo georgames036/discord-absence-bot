@@ -83,7 +83,8 @@ async def _request(
 
             except Exception:
                 raise RuntimeError(
-                    f"GAS APIがJSONを返しませんでした: {text}"
+                    f"GAS APIがJSONを返しませんでした: "
+                    f"{text}"
                 )
 
     if not result.get("ok", False):
@@ -479,7 +480,6 @@ def describe_schedule(
 
     # 毎週
     if pattern == PATTERN_EVERY:
-
         return f"毎週{day_str}"
 
     # 隔週
@@ -487,7 +487,8 @@ def describe_schedule(
 
         return (
             f"隔週{day_str}"
-            f"（基準日: {cls['start_date']}）"
+            f"（基準日: "
+            f"{cls['start_date']}）"
         )
 
     return "不明"
