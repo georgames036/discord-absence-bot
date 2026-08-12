@@ -34,47 +34,62 @@ WEEKDAY_JP = ["月", "火", "水", "木", "金", "土", "日"]
 # ============================================================
 # GAS API通信
 # ============================================================
-#
-# GAS(script.google.com/.../exec)は必ず一度 script.googleusercontent.com へ
-# 302リダイレクトする。POSTでこれを行うと、多くのHTTPクライアント（aiohttp含む）が
-# リダイレクトの途中でPOSTをGETに変換してしまい、doPost()ではなくdoGet()が
-# 呼ばれてしまう問題が起きる（手動でPOSTを追いかけ直しても、Google側のURLの
-# 仕様上うまくいかないケースがある）。
-#
-# GETはリダイレクトを挟んでもメソッドが変わらないため、この問題が原理的に起きない。
-# そのため、すべてのリクエストをGET + クエリパラメータ方式に統一する。
-# (GAS側の doGet も同様に action / data を受け取れるよう対応させる必要がある)
 
-async def _request(action: str, data: Optional[dict] = None) -> dict:
+async def _request(
+    action: str,
+    data: Optional[dict] = None
+) -> dict:
+
     if not GAS_API_URL:
-        raise RuntimeError("GAS_API_URL が設定されていません。")
+        raise RuntimeError(
+            "GAS_API_URL が設定されていません。"
+        )
 
     if not GAS_API_KEY:
-        raise RuntimeError("GAS_API_KEY が設定されていません。")
+        raise RuntimeError(
+            "GAS_API_KEY が設定されていません。"
+        )
 
     params = {
         "action": action,
         "api_key": GAS_API_KEY,
-        "data": json.dumps(data or {}, ensure_ascii=False),
+        "data": json.dumps(
+            data or {},
+            ensure_ascii=False
+        ),
     }
 
     timeout = aiohttp.ClientTimeout(total=30)
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(GAS_API_URL, params=params) as response:
+    async with aiohttp.ClientSession(
+        timeout=timeout
+    ) as session:
+
+        async with session.get(
+            GAS_API_URL,
+            params=params
+        ) as response:
+
             text = await response.text()
 
             if response.status != 200:
-                raise RuntimeError(f"GAS API HTTPエラー: {response.status}: {text}")
+                raise RuntimeError(
+                    f"GAS API HTTPエラー: "
+                    f"{response.status}: {text}"
+                )
 
             try:
                 result = json.loads(text)
+
             except Exception:
-                raise RuntimeError(f"GAS APIがJSONを返しませんでした: {text}")
+                raise RuntimeError(
+                    f"GAS APIがJSONを返しませんでした: {text}"
+                )
 
     if not result.get("ok", False):
         raise RuntimeError(
-            f"GAS APIエラー: {result.get('error', '不明なエラー')}"
+            f"GAS APIエラー: "
+            f"{result.get('error', '不明なエラー')}"
         )
 
     return result.get("data", {})
@@ -85,6 +100,7 @@ async def _request(action: str, data: Optional[dict] = None) -> dict:
 # ============================================================
 
 async def init_db():
+
     await _request("init_db")
 
 
@@ -92,7 +108,11 @@ async def init_db():
 # guild_config
 # ============================================================
 
-async def set_notify_channel(guild_id: int, channel_id: int):
+async def set_notify_channel(
+    guild_id: int,
+    channel_id: int
+):
+
     await _request(
         "set_notify_channel",
         {
@@ -102,7 +122,10 @@ async def set_notify_channel(guild_id: int, channel_id: int):
     )
 
 
-async def get_notify_channel(guild_id: int) -> Optional[int]:
+async def get_notify_channel(
+    guild_id: int
+) -> Optional[int]:
+
     result = await _request(
         "get_notify_channel",
         {
@@ -119,11 +142,17 @@ async def get_notify_channel(guild_id: int) -> Optional[int]:
 
 
 async def get_all_guild_ids_with_channel():
-    result = await _request("get_all_guild_ids_with_channel")
+
+    result = await _request(
+        "get_all_guild_ids_with_channel"
+    )
 
     return [
         int(guild_id)
-        for guild_id in result.get("guild_ids", [])
+        for guild_id in result.get(
+            "guild_ids",
+            []
+        )
     ]
 
 
@@ -156,10 +185,16 @@ async def add_class(
         },
     )
 
-    return bool(result.get("created", False))
+    return bool(
+        result.get("created", False)
+    )
 
 
-async def remove_class(guild_id: int, name: str) -> bool:
+async def remove_class(
+    guild_id: int,
+    name: str
+) -> bool:
+
     result = await _request(
         "remove_class",
         {
@@ -168,7 +203,9 @@ async def remove_class(guild_id: int, name: str) -> bool:
         },
     )
 
-    return bool(result.get("removed", False))
+    return bool(
+        result.get("removed", False)
+    )
 
 
 async def get_class(
@@ -201,7 +238,10 @@ async def get_class_by_id(
     return result.get("class")
 
 
-async def list_classes(guild_id: int) -> list:
+async def list_classes(
+    guild_id: int
+) -> list:
+
     result = await _request(
         "list_classes",
         {
@@ -209,7 +249,10 @@ async def list_classes(guild_id: int) -> list:
         },
     )
 
-    return result.get("classes", [])
+    return result.get(
+        "classes",
+        []
+    )
 
 
 async def update_threshold(
@@ -227,7 +270,9 @@ async def update_threshold(
         },
     )
 
-    return bool(result.get("updated", False))
+    return bool(
+        result.get("updated", False)
+    )
 
 
 # ============================================================
@@ -267,7 +312,9 @@ async def remove_latest_absence(
         },
     )
 
-    return bool(result.get("removed", False))
+    return bool(
+        result.get("removed", False)
+    )
 
 
 async def count_absences(
@@ -283,7 +330,9 @@ async def count_absences(
         },
     )
 
-    return int(result.get("count", 0))
+    return int(
+        result.get("count", 0)
+    )
 
 
 async def list_absences(
@@ -300,8 +349,14 @@ async def list_absences(
     )
 
     return [
-        (row.get("date"), row.get("note"))
-        for row in result.get("absences", [])
+        (
+            row.get("date"),
+            row.get("note")
+        )
+        for row in result.get(
+            "absences",
+            []
+        )
     ]
 
 
@@ -318,7 +373,10 @@ async def get_users_with_absences(
 
     return [
         int(user_id)
-        for user_id in result.get("user_ids", [])
+        for user_id in result.get(
+            "user_ids",
+            []
+        )
     ]
 
 
@@ -326,12 +384,19 @@ async def get_users_with_absences(
 # スケジュール判定
 # ============================================================
 
-def is_class_day(cls: dict, target_date: date) -> bool:
+def is_class_day(
+    cls: dict,
+    target_date: date
+) -> bool:
 
     pattern = cls["pattern"]
 
+    # 特定日のみ
     if pattern == PATTERN_SPECIFIC:
-        dates = (cls["specific_dates"] or "").split(",")
+
+        dates = (
+            cls["specific_dates"] or ""
+        ).split(",")
 
         return target_date.isoformat() in [
             d.strip()
@@ -339,39 +404,54 @@ def is_class_day(cls: dict, target_date: date) -> bool:
             if d.strip()
         ]
 
+    # 曜日が設定されていない
     if cls["day_of_week"] is None:
         return False
 
-    if target_date.weekday() != int(cls["day_of_week"]):
+    # 曜日が違う
+    if target_date.weekday() != int(
+        cls["day_of_week"]
+    ):
         return False
 
+    # 毎週
     if pattern == PATTERN_EVERY:
         return True
 
+    # 隔週
     if pattern == PATTERN_BIWEEKLY:
 
         if not cls["start_date"]:
             return False
 
-        start = date.fromisoformat(cls["start_date"])
+        start = date.fromisoformat(
+            cls["start_date"]
+        )
 
         if target_date < start:
             return False
 
-        weeks_diff = (target_date - start).days // 7
+        weeks_diff = (
+            target_date - start
+        ).days // 7
 
         return weeks_diff % 2 == 0
 
     return False
 
 
-def describe_schedule(cls: dict) -> str:
+def describe_schedule(
+    cls: dict
+) -> str:
 
     pattern = cls["pattern"]
 
+    # 特定日のみ
     if pattern == PATTERN_SPECIFIC:
 
-        dates = (cls["specific_dates"] or "").split(",")
+        dates = (
+            cls["specific_dates"] or ""
+        ).split(",")
 
         dates = [
             d.strip()
@@ -379,20 +459,32 @@ def describe_schedule(cls: dict) -> str:
             if d.strip()
         ]
 
-        return f"特定日のみ（{', '.join(dates)}）"
+        return (
+            f"特定日のみ"
+            f"（{', '.join(dates)}）"
+        )
 
+    # 曜日
     if cls["day_of_week"] is not None:
+
         day_str = (
-            WEEKDAY_JP[int(cls["day_of_week"])]
+            WEEKDAY_JP[
+                int(cls["day_of_week"])
+            ]
             + "曜日"
         )
+
     else:
         day_str = "?"
 
+    # 毎週
     if pattern == PATTERN_EVERY:
+
         return f"毎週{day_str}"
 
+    # 隔週
     if pattern == PATTERN_BIWEEKLY:
+
         return (
             f"隔週{day_str}"
             f"（基準日: {cls['start_date']}）"
