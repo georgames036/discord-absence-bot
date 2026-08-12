@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 import database as db
 from keep_alive import start_keep_alive_server
 
-
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -27,7 +26,6 @@ bot = commands.Bot(
     command_prefix="!",
     intents=intents
 )
-
 
 INITIAL_EXTENSIONS = [
     "cogs.classes",
@@ -53,24 +51,22 @@ async def on_ready():
     try:
 
         # ========================================
-        # グローバルコマンドを削除
+        # グローバルコマンドを同期
         # ========================================
 
-        bot.tree.clear_commands(guild=None)
-
-        await bot.tree.sync()
+        global_synced = await bot.tree.sync()
 
         logger.info(
-            "グローバルスラッシュコマンドを削除しました。"
+            f"{len(global_synced)} 件のグローバルスラッシュコマンドを同期しました。"
         )
 
         # ========================================
-        # ギルド用コマンドを登録
+        # ギルド用コマンドを同期
         # ========================================
 
         for guild in bot.guilds:
 
-            # bot.tree に登録されているコマンドを
+            # グローバルコマンドを
             # このギルド用Treeへコピー
             bot.tree.copy_global_to(
                 guild=guild
