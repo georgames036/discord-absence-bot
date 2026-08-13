@@ -1,6 +1,7 @@
 """
 授業（クラス）の登録・一覧・削除・通知チャンネル設定を行うCog
 """
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -19,6 +20,7 @@ WEEKDAY_CHOICES = [
     app_commands.Choice(name="日曜日", value=6),
 ]
 
+
 PATTERN_CHOICES = [
     app_commands.Choice(name="毎週", value=db.PATTERN_EVERY),
     app_commands.Choice(name="隔週", value=db.PATTERN_BIWEEKLY),
@@ -35,6 +37,7 @@ def _validate_date(s: str) -> bool:
 
 
 class ClassesCog(commands.Cog):
+
     class_group = app_commands.Group(
         name="class",
         description="授業スケジュールの管理"
@@ -69,6 +72,10 @@ class ClassesCog(commands.Cog):
         start_date: str = None,
         specific_dates: str = None,
     ):
+        # GASへの通信に時間がかかっても
+        # Discordの3秒制限に引っかからないようにする
+        await interaction.response.defer()
+
         pattern_value = pattern.value
 
         if pattern_value in (
@@ -76,7 +83,7 @@ class ClassesCog(commands.Cog):
             db.PATTERN_BIWEEKLY
         ):
             if weekday is None:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "毎週・隔週の場合は `weekday`（曜日）を指定してください。",
                     ephemeral=True
                 )
@@ -84,7 +91,7 @@ class ClassesCog(commands.Cog):
 
         if pattern_value == db.PATTERN_BIWEEKLY:
             if not start_date or not _validate_date(start_date):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "隔週の場合は `start_date` を `YYYY-MM-DD` 形式で指定してください。",
                     ephemeral=True
                 )
@@ -92,7 +99,7 @@ class ClassesCog(commands.Cog):
 
         if pattern_value == db.PATTERN_SPECIFIC:
             if not specific_dates:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "特定日のみの場合は `specific_dates` にカンマ区切りで日付を指定してください。",
                     ephemeral=True
                 )
@@ -105,8 +112,10 @@ class ClassesCog(commands.Cog):
             ]
 
             if not all(_validate_date(d) for d in parts):
-                await interaction.response.send_message(
-                    "`specific_dates` は `YYYY-MM-DD,YYYY-MM-DD,...` の形式で指定してください。",
+                await interaction.followup.send(
+                    "`specific_dates` は "
+                    "`YYYY-MM-DD,YYYY-MM-DD,...` "
+                    "の形式で指定してください。",
                     ephemeral=True
                 )
                 return
@@ -125,7 +134,7 @@ class ClassesCog(commands.Cog):
         )
 
         if not ok:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"授業「{name}」は既に登録されています。",
                 ephemeral=True
             )
@@ -136,7 +145,7 @@ class ClassesCog(commands.Cog):
             name
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ 授業「{name}」を登録しました。\n"
             f"スケジュール: {db.describe_schedule(cls)}\n"
             f"危険ライン: {threshold}回"
@@ -154,17 +163,19 @@ class ClassesCog(commands.Cog):
         interaction: discord.Interaction,
         name: str
     ):
+        await interaction.response.defer()
+
         ok = await db.remove_class(
             interaction.guild_id,
             name
         )
 
         if ok:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"🗑️ 授業「{name}」を削除しました。"
             )
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"授業「{name}」が見つかりません。",
                 ephemeral=True
             )
@@ -177,12 +188,14 @@ class ClassesCog(commands.Cog):
         self,
         interaction: discord.Interaction
     ):
+        await interaction.response.defer()
+
         classes = await db.list_classes(
             interaction.guild_id
         )
 
         if not classes:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "登録されている授業はありません。"
             )
             return
@@ -202,7 +215,7 @@ class ClassesCog(commands.Cog):
             color=discord.Color.blue(),
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed
         )
 
@@ -218,12 +231,14 @@ class ClassesCog(commands.Cog):
         interaction: discord.Interaction,
         channel: discord.TextChannel
     ):
+        await interaction.response.defer()
+
         await db.set_notify_channel(
             interaction.guild_id,
             channel.id
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ 通知チャンネルを {channel.mention} に設定しました。"
         )
 
@@ -241,6 +256,8 @@ class ClassesCog(commands.Cog):
         name: str,
         threshold: int
     ):
+        await interaction.response.defer()
+
         ok = await db.update_threshold(
             interaction.guild_id,
             name,
@@ -248,12 +265,12 @@ class ClassesCog(commands.Cog):
         )
 
         if ok:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"✅ 「{name}」の危険ラインを "
                 f"{threshold}回 に更新しました。"
             )
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"授業「{name}」が見つかりません。",
                 ephemeral=True
             )
